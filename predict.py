@@ -18,18 +18,18 @@ def predict_img(net,
                 scale_factor=1,
                 out_threshold=0.5):
     net.eval()
-    img = torch.from_numpy(BasicDataset.preprocess(None, full_img, scale_factor, is_mask=False))
+    img = torch.from_numpy(BasicDataset.preprocess(full_img, scale_factor, is_mask=False))
     img = img.unsqueeze(0)
     img = img.to(device=device, dtype=torch.float32)
 
     with torch.no_grad():
         output = net(img).cpu()
         output = F.interpolate(output, (full_img.size[1], full_img.size[0]), mode='bilinear')
-        if net.n_classes > 1:
-            mask = output.argmax(dim=1)
-        else:
-            mask = torch.sigmoid(output) > out_threshold
-
+        #if net.n_classes > 1:
+        #    mask = output.argmax(dim=1)
+        #else:
+        #    mask = torch.sigmoid(output) > out_threshold
+    mask=output
     return mask[0].long().squeeze().numpy()
 
 
@@ -47,7 +47,7 @@ def get_args():
     parser.add_argument('--scale', '-s', type=float, default=0.5,
                         help='Scale factor for the input images')
     parser.add_argument('--bilinear', action='store_true', default=False, help='Use bilinear upsampling')
-    parser.add_argument('--classes', '-c', type=int, default=2, help='Number of classes')
+    parser.add_argument('--classes', '-c', type=int, default=1, help='Number of classes')
     
     return parser.parse_args()
 
@@ -59,7 +59,8 @@ def get_output_filenames(args):
     return args.output or list(map(_generate_name, args.input))
 
 
-def mask_to_image(mask: np.ndarray, mask_values):
+def mask_to_image(mask: np.ndarray):
+    '''
     if isinstance(mask_values[0], list):
         out = np.zeros((mask.shape[-2], mask.shape[-1], len(mask_values[0])), dtype=np.uint8)
     elif mask_values == [0, 1]:
@@ -72,7 +73,8 @@ def mask_to_image(mask: np.ndarray, mask_values):
 
     for i, v in enumerate(mask_values):
         out[mask == i] = v
-
+    '''
+    out=mask.astype(np.uint8)
     return Image.fromarray(out)
 
 
@@ -80,8 +82,12 @@ if __name__ == '__main__':
     args = get_args()
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-    in_files = args.input
-    out_files = get_output_filenames(args)
+    # Get list of input image files
+    input_folder = args.input[0]  # Assuming only one input folder is provided
+    in_files = [os.path.join(input_folder, filename) for filename in os.listdir(input_folder) if filename.endswith(('.png', '.jpg', '.jpeg', '.tif'))]
+
+    # Get list of output image files
+    out_files = [os.path.join('data/test_dataset/predicted', f'{os.path.splitext(os.path.basename(filename))[0]}_OUT.png') for filename in in_files]
 
     net = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
 
@@ -91,7 +97,8 @@ if __name__ == '__main__':
 
     net.to(device=device)
     state_dict = torch.load(args.model, map_location=device)
-    mask_values = state_dict.pop('mask_values', [0, 1])
+    #mask_values = state_dict.pop('mask_values', [0, 1])
+    state_dict.pop('mask_maxval', None)
     net.load_state_dict(state_dict)
 
     logging.info('Model loaded!')
@@ -108,7 +115,7 @@ if __name__ == '__main__':
 
         if not args.no_save:
             out_filename = out_files[i]
-            result = mask_to_image(mask, mask_values)
+            result = mask_to_image(mask)
             result.save(out_filename)
             logging.info(f'Mask saved to {out_filename}')
 

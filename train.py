@@ -18,9 +18,10 @@ from evaluate import evaluate
 from unet import UNet
 from utils.data_loading import BasicDataset, CarvanaDataset
 from utils.dice_score import dice_loss
+from utils.weighting import calculate_weights, weights_tensor
 
-dir_img = Path('./data/imgs/')
-dir_mask = Path('./data/masks/')
+dir_img = Path('./data/train_dataset/imgs/')
+dir_mask = Path('./data/train_dataset/masks/')
 dir_checkpoint = Path('./checkpoints/')
 
 
@@ -37,6 +38,7 @@ def train_model(
         weight_decay: float = 1e-8,
         momentum: float = 0.999,
         gradient_clipping: float = 1.0,
+        field: str='Weights'
 ):
     # 1. Create dataset
     try:
@@ -71,22 +73,20 @@ def train_model(
         Device:          {device.type}
         Images scaling:  {img_scale}
         Mixed Precision: {amp}
+        Field: {field}
     ''')
 
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
-    #adam 
-    #TO DO
-    #CHNAGE LR TO -4 WITH ADAM.
-    #optimizer = optim.RMSprop(model.parameters(),
-    #                          lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
     optimizer = optim.Adam(model.parameters(),
                            lr=learning_rate, weight_decay=weight_decay, betas=(0.9, 0.999), eps=1e-08, foreach = True) 
-    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
-    #to do
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5) 
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     criterion = nn.L1Loss()
     global_step = 0
 
+    #calculate weights by bin
+    bin_width=1
+    weights_df=calculate_weights(train_loader, val_loader, bin_width, device)
     # 5. Begin training
     for epoch in range(1, epochs + 1):
         model.train()
@@ -94,31 +94,24 @@ def train_model(
         with tqdm(total=n_train, desc=f'Epoch {epoch}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
                 images, true_masks = batch['image'], batch['mask']
-                print(images)
-                print(true_masks)
                 assert images.shape[1] == model.n_channels, \
                     f'Network has been defined with {model.n_channels} input channels, ' \
                     f'but loaded images have {images.shape[1]} channels. Please check that ' \
                     'the images are loaded correctly.'
-                #to check
-                #logging.info(f'image shape {images.shape}')
-                #logging.info(f'true mask shape {true_masks.shape}')
+
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
                 true_masks = true_masks.to(device=device, dtype=torch.float32)#to check
-               
+                #calculate weight matrix for the current true masks
+                weights_tr=weights_tensor(true_masks,weights_df,field)
                 with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
                     masks_pred = model(images)
-                    print('predicted')
-                    print(masks_pred)
-                    #logging.info(f'mask pred shape {masks_pred.shape}')
                     if model.n_classes == 1:
-                        loss = criterion(masks_pred, true_masks.float())
+                        loss = criterion(torch.mul(masks_pred,weights_tr), torch.mul(true_masks.float(),weights_tr))
 
                     else:
                         logging.error('Inconsistency problem. Regression problem dont allow more than 1 class')
 
                 optimizer.zero_grad(set_to_none=True)
-                #check
                 grad_scaler.scale(loss).backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)
                 grad_scaler.step(optimizer)
@@ -157,7 +150,7 @@ def train_model(
                             experiment.log({
                                 'learning rate': optimizer.param_groups[0]['lr'],
                                 'validation Loss L1': val_score[0],
-                                'validation Loss RMSE': val_score[0],
+                                'validation Loss RMSE': val_score[1],
                                 'images': wandb.Image(images[0].cpu()),
                                 'masks': {
                                     'true': wandb.Image(true_masks[0].float().cpu()),
@@ -185,12 +178,13 @@ def get_args():
     parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-4,
                         help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=False, help='Load model from a .pth file')
-    parser.add_argument('--scale', '-s', type=float, default=1, help='Downscaling factor of the images')
+    parser.add_argument('--scale', '-s', type=float, default=0.5, help='Downscaling factor of the images')
     parser.add_argument('--validation', '-v', dest='val', type=float, default=10.0,
                         help='Percent of the data that is used as validation (0-100)')
     parser.add_argument('--amp', action='store_true', default=False, help='Use mixed precision')
     parser.add_argument('--bilinear', action='store_true', default=False, help='Use bilinear upsampling')
     parser.add_argument('--classes', '-c', type=int, default=1, help='Number of classes')
+    parser.add_argument('--field', '-w', type=str, default='Weights', help='Weight field')
 
     return parser.parse_args()
 
@@ -202,10 +196,8 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    #remove 4th channel, no data
     model = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
     model = model.to(memory_format=torch.channels_last)
 
@@ -229,7 +221,8 @@ if __name__ == '__main__':
             device=device,
             img_scale=args.scale,
             val_percent=args.val / 100,
-            amp=args.amp
+            amp=args.amp,
+            field=args.field
         )
     except torch.cuda.OutOfMemoryError:
         logging.error('Detected OutOfMemoryError! '

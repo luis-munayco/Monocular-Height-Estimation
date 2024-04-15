@@ -86,7 +86,8 @@ class BasicDataset(Dataset):
         img = np.asarray(pil_img)
 
         if is_mask:
-            mask=img[np.newaxis, :, :]
+            mask=np.maximum(img,0)
+            mask=mask[np.newaxis, :, :]
             return mask
 
         else:
