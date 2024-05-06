@@ -1,5 +1,10 @@
 *.pyc
-data/
+data/test_dataset/imgs/*
+data/test_dataset/masks/*
+data/test_dataset/predicted_baseline/*
+data/test_dataset/predicted_modified/*
+data/train_dataset/imgs/*
+data/train_dataset/masks/*
 __pycache__/
 checkpoints/
 *.pth
