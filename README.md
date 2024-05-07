@@ -117,5 +117,5 @@ Original paper by Olaf Ronneberger, Philipp Fischer, Thomas Brox:
 ![network architecture](https://i.imgur.com/jeDVpqF.png)
 
 
-![Modified U-Net](imgs\balancedunet.png)
+![Modified U-Net](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/balancedunet.png)
 
