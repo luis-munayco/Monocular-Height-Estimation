@@ -10,9 +10,9 @@ This model was trained from scratch with 2k images and scored a Mean Absolute Er
 The input images and target masks should be in the `data/train_dataset/imgs` and `data/train_dataset/masks` folders respectively.
 Train images dataset contain the satellite monocular images that will be used as input for the model. And train masks dataset contain the height masks that will be used as targets for training the model.
 
-![Prediction1](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_1.png)
+![Prediction1](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_1_nb.png)
 
-![Prediction2](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_2.png)
+![Prediction2](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_2_nb.png)
 
 However, as it can be seen from the histogram below, most of the masks pixels have low heights values (< 50m). This is expected given that, as in the real world, most of the building have a low/medium height, and skycrapper or tall buildings are mostly excepctions. Having said this, the main challenge to develop an accurate model is the highly imbalanced dataset.
 
@@ -52,6 +52,6 @@ Predict masks from input images
 ```
 The model to be used for the prediction can be specified using the argument `--model MODEL.pth`.
 
-![Prediction1nb](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_1_nb.png)
+![Prediction1nb](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_1.png)
 
-![Prediction2nb](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_2_nb.png)
+![Prediction2nb](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_2.png)
