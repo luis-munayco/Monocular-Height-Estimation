@@ -16,7 +16,7 @@ from tqdm import tqdm
 import wandb
 from evaluate import evaluate
 from unet import UNet
-from utils.data_loading import BasicDataset, CarvanaDataset
+from utils.data_loading import BasicDataset, MonocularDataset
 from utils.dice_score import dice_loss
 
 dir_img = Path('./data/test_dataset/imgs/')
@@ -33,7 +33,7 @@ def test_model(
 ):
     # 1. Create dataset
     try:
-        dataset = CarvanaDataset(dir_img, dir_mask, img_scale)
+        dataset = MonocularDataset(dir_img, dir_mask, img_scale)
     except (AssertionError, RuntimeError, IndexError):
         dataset = BasicDataset(dir_img, dir_mask, img_scale)
 

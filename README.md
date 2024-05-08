@@ -1,17 +1,22 @@
 ## Description
-This model was trained from scratch with 5k images and scored a [Dice coefficient](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient) of 0.988423 on over 100k test images.
+This project aims to develop a ML model to estimate the height using only monocular satellite images as inputs. To solve this 2D regresion problem,a modified version of the well-know U-Net NN is being used. The original U-Net network was designed to solve classification problems, however, to solve our height regression problem, output activation layer had been modified in order to have continues values in the output.
+Likewise, the loss function used in the backpropagation for the U-Net NN had to be also modified. Originally, loss function was set as Dice Score, however, for regression problems, an L1 loss function has to be used.
+This model was trained from scratch with 2k images and scored a Mean Absolute Error of 2.25m on over 200 test images.
 
-It can be easily used for multiclass segmentation, portrait segmentation, medical segmentation, ...
+![Pixel Height Histogram](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/description.png)
 
-This model was trained from scratch with 2k images and scored a Mean Absolute Error of 2.25 on over 200 test images.
+## Data
 
-## Usage
-**Note : Use Python 3.8 or newer**
+The input images and target masks should be in the `data/train_dataset/imgs` and `data/train_dataset/masks` folders respectively.
+Train images dataset contain the satellite monocular images that will be used as input for the model. And train masks dataset contain the height masks that will be used as targets for training the model.
 
-### Docker
+![Prediction1](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_1.png)
 
-A docker image containing the code and the dependencies is available on [DockerHub](https://hub.docker.com/repository/docker/milesial/unet).
+![Prediction2](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_2.png)
 
+However, as it can be seen from the histogram below, most of the masks pixels have low heights values (< 50m). This is expected given that, as in the real world, most of the building have a low/medium height, and skycrapper or tall buildings are mostly excepctions. Having said this, the main challenge to develop an accurate model is the highly imbalanced dataset.
+
+![Pixel Height Histogram](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/histogram.png)
 
 ### Training
 
@@ -21,37 +26,21 @@ usage: train.py [-h] [--epochs E] [--batch-size B] [--learning-rate LR]
                 [--load LOAD] [--scale SCALE] [--validation VAL] [--amp]
 
 Train the UNet on images and target masks
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --epochs E, -e E      Number of epochs
-  --batch-size B, -b B  Batch size
-  --learning-rate LR, -l LR
-                        Learning rate
-  --load LOAD, -f LOAD  Load model from a .pth file
-  --scale SCALE, -s SCALE
-                        Downscaling factor of the images
-  --validation VAL, -v VAL
-                        Percent of the data that is used as validation (0-100)
-  --amp                 Use mixed precision
 ```
+To overcome the problem of the highly imbalanced dataset, a balanced U-Net model have to be designed. This is, weights is going to be applied to the loss function according to the histogram of heights. To calculate the weights, a square inverse function is being used following [Lang, 2003](https://www.nature.com/articles/s41559-023-02206-6)
 
-By default, the `scale` is 0.5, so if you wish to obtain better results (but use more memory), set it to 1.
+![Modified U-Net](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/balancedunet.png)
 
-Automatic mixed precision is also available with the `--amp` flag. [Mixed precision](https://arxiv.org/abs/1710.03740) allows the model to use less memory and to be faster on recent GPUs by using FP16 arithmetic. Enabling AMP is recommended.
-
+Model was trained with 2k images and scored a Mean Absolute Error of 2.25 on over 200 test images.
+Dataset 
 
 ### Prediction
 
-After training your model and saving it to `MODEL.pth`, you can easily test the output masks on your images via the CLI.
+After training the model and saving it to `MODEL.pth`, this can be tested with the test masks on the test images.
 
 To predict a single image and save it:
 
 `python predict.py -i image.jpg -o output.jpg`
-
-To predict a multiple images and show them without saving them:
-
-`python predict.py -i image1.jpg image2.jpg --viz --no-save`
 
 ```console
 > python predict.py -h
@@ -60,62 +49,9 @@ usage: predict.py [-h] [--model FILE] --input INPUT [INPUT ...]
                   [--mask-threshold MASK_THRESHOLD] [--scale SCALE]
 
 Predict masks from input images
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --model FILE, -m FILE
-                        Specify the file in which the model is stored
-  --input INPUT [INPUT ...], -i INPUT [INPUT ...]
-                        Filenames of input images
-  --output INPUT [INPUT ...], -o INPUT [INPUT ...]
-                        Filenames of output images
-  --viz, -v             Visualize the images as they are processed
-  --no-save, -n         Do not save the output masks
-  --mask-threshold MASK_THRESHOLD, -t MASK_THRESHOLD
-                        Minimum probability value to consider a mask pixel white
-  --scale SCALE, -s SCALE
-                        Scale factor for the input images
 ```
-You can specify which model file to use with `--model MODEL.pth`.
+The model to be used for the prediction can be specified using the argument `--model MODEL.pth`.
 
-## Weights & Biases
+![Prediction1nb](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_1_nb.png)
 
-The training progress can be visualized in real-time using [Weights & Biases](https://wandb.ai/).  Loss curves, validation curves, weights and gradient histograms, as well as predicted masks are logged to the platform.
-
-When launching a training, a link will be printed in the console. Click on it to go to your dashboard. If you have an existing W&B account, you can link it
- by setting the `WANDB_API_KEY` environment variable. If not, it will create an anonymous run which is automatically deleted after 7 days.
-
-
-## Pretrained model
-A [pretrained model](https://github.com/milesial/Pytorch-UNet/releases/tag/v3.0) is available for the Carvana dataset. It can also be loaded from torch.hub:
-
-```python
-net = torch.hub.load('milesial/Pytorch-UNet', 'unet_carvana', pretrained=True, scale=0.5)
-```
-Available scales are 0.5 and 1.0.
-
-## Data
-The Carvana data is available on the [Kaggle website](https://www.kaggle.com/c/carvana-image-masking-challenge/data).
-
-You can also download it using the helper script:
-
-```
-bash scripts/download_data.sh
-```
-
-The input images and target masks should be in the `data/imgs` and `data/masks` folders respectively (note that the `imgs` and `masks` folder should not contain any sub-folder or any other files, due to the greedy data-loader). For Carvana, images are RGB and masks are black and white.
-
-You can use your own dataset as long as you make sure it is loaded properly in `utils/data_loading.py`.
-
-
----
-
-Original paper by Olaf Ronneberger, Philipp Fischer, Thomas Brox:
-
-[U-Net: Convolutional Networks for Biomedical Image Segmentation](https://arxiv.org/abs/1505.04597)
-
-![network architecture](https://i.imgur.com/jeDVpqF.png)
-
-
-![Modified U-Net](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/balancedunet.png)
-
+![Prediction2nb](https://github.com/luis-munayco/Monocular-Height-Estimation/blob/master/imgs/Predicted_2_nb.png)

@@ -67,11 +67,6 @@ class BasicDataset(Dataset):
                 p.imap(partial(max_mask_values, mask_dir=self.mask_dir, mask_suffix=self.mask_suffix), self.ids),
                 total=len(self.ids)
             ))
-        ###
-        #self.mask_values = list(sorted(np.unique(np.concatenate(unique), axis=0).tolist()))
-        #self.mask_maxval = sum(max_values)/len(max_values)
-        #logging.info(f'Unique mask values: {self.mask_values}')
-        #logging.info(f'Max mask value: {self.mask_maxval}')
 
     def __len__(self):
         return len(self.ids)
@@ -115,7 +110,6 @@ class BasicDataset(Dataset):
         assert img.size == mask.size, \
             f'Image and mask {name} should be the same size, but are {img.size} and {mask.size}'
 
-        #TO DO
         img = self.preprocess(img, self.scale, is_mask=False)
         mask = self.preprocess(mask, self.scale, is_mask=True)
 
@@ -125,6 +119,6 @@ class BasicDataset(Dataset):
         }
 
 
-class CarvanaDataset(BasicDataset):
+class MonocularDataset(BasicDataset):
     def __init__(self, images_dir, mask_dir, scale=1):
         super().__init__(images_dir, mask_dir, scale, mask_suffix='_AGL', img_suffix='_BAM')

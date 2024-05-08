@@ -16,7 +16,7 @@ from tqdm import tqdm
 import wandb
 from evaluate import evaluate
 from unet import UNet
-from utils.data_loading import BasicDataset, CarvanaDataset
+from utils.data_loading import BasicDataset, MonocularDataset
 from utils.dice_score import dice_loss
 from utils.weighting import calculate_weights, weights_tensor
 
@@ -42,7 +42,7 @@ def train_model(
 ):
     # 1. Create dataset
     try:
-        dataset = CarvanaDataset(dir_img, dir_mask, img_scale)
+        dataset = MonocularDataset(dir_img, dir_mask, img_scale)
     except (AssertionError, RuntimeError, IndexError):
         dataset = BasicDataset(dir_img, dir_mask, img_scale)
 
@@ -100,7 +100,7 @@ def train_model(
                     'the images are loaded correctly.'
 
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
-                true_masks = true_masks.to(device=device, dtype=torch.float32)#to check
+                true_masks = true_masks.to(device=device, dtype=torch.float32)
                 #calculate weight matrix for the current true masks
                 weights_tr=weights_tensor(true_masks,weights_df,field)
                 with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
